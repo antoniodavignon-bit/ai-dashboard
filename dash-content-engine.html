@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dash — Content Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --base:#15121A;
+    --surface:#1E1A26;
+    --surface2:#272231;
+    --line:rgba(255,255,255,.08);
+    --line-strong:rgba(255,255,255,.14);
+    --text:#F6F2EA;
+    --muted:#A199AE;
+    --faint:#6F6878;
+    --ign-1:#FF6A2C;
+    --ign-2:#FFB23E;
+    --hot:#FF4D6D;
+    --ok:#46E5A0;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(900px 480px at 50% -160px, rgba(255,106,44,.16), transparent 70%),
+      radial-gradient(700px 400px at 110% 0%, rgba(255,77,109,.10), transparent 70%),
+      var(--base);
+    color:var(--text);
+    font-family:"Inter",system-ui,sans-serif;
+    line-height:1.5;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:42px 22px 90px}
+
+  /* ---------- header ---------- */
+  .eyebrow{
+    font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.28em;
+    text-transform:uppercase;color:var(--ign-2);display:flex;align-items:center;gap:10px;
+  }
+  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--ign-1);
+    box-shadow:0 0 12px var(--ign-1);animation:pulse 2.4s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  h1{
+    font-family:"Bricolage Grotesque",sans-serif;font-weight:800;
+    font-size:clamp(38px,6.5vw,68px);line-height:.98;letter-spacing:-.02em;
+    margin:16px 0 12px;
+  }
+  h1 .glow{
+    background:linear-gradient(100deg,var(--ign-1),var(--ign-2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .lede{font-size:17px;color:var(--muted);max-width:560px}
+
+  /* ---------- console ---------- */
+  .console{
+    margin-top:34px;background:linear-gradient(180deg,var(--surface),#1A1622);
+    border:1px solid var(--line);border-radius:20px;padding:26px;
+    box-shadow:0 30px 80px -40px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.04);
+  }
+  .console-head{display:flex;align-items:center;justify-content:space-between;
+    border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:22px;flex-wrap:wrap;gap:8px}
+  .console-head .label{font-family:"Space Mono",monospace;font-size:12px;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--faint)}
+  .readout{font-family:"Space Mono",monospace;font-size:12px;color:var(--muted);
+    display:flex;align-items:center;gap:8px}
+  .readout .led{width:8px;height:8px;border-radius:50%;background:var(--faint);transition:.3s}
+  .readout.live .led{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+  .readout.run .led{background:var(--ign-1);box-shadow:0 0 10px var(--ign-1);animation:pulse 1s infinite}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .field{display:flex;flex-direction:column;gap:8px}
+  .field.full{grid-column:1 / -1}
+  label{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--muted)}
+  input,textarea,select{
+    background:var(--base);border:1px solid var(--line-strong);border-radius:12px;
+    color:var(--text);font-family:"Inter",sans-serif;font-size:15px;padding:13px 14px;
+    width:100%;resize:vertical;transition:border-color .2s,box-shadow .2s;
+  }
+  textarea{min-height:74px}
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--ign-2);
+    box-shadow:0 0 0 3px rgba(255,178,62,.16)}
+  input::placeholder,textarea::placeholder{color:var(--faint)}
+
+  .chips{display:flex;flex-wrap:wrap;gap:9px}
+  .chip{font-size:13px;font-weight:500;padding:9px 14px;border-radius:999px;cursor:pointer;
+    border:1px solid var(--line-strong);background:var(--base);color:var(--muted);
+    transition:.18s;user-select:none}
+  .chip:hover{border-color:var(--ign-2);color:var(--text)}
+  .chip.on{background:linear-gradient(100deg,rgba(255,106,44,.22),rgba(255,178,62,.22));
+    border-color:var(--ign-2);color:var(--text)}
+
+  .run-row{display:flex;align-items:center;gap:16px;margin-top:24px;flex-wrap:wrap}
+  .ignite{
+    appearance:none;border:none;cursor:pointer;
+    font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:17px;letter-spacing:.01em;
+    color:#1a0e05;padding:16px 30px;border-radius:14px;
+    background:linear-gradient(100deg,var(--ign-1),var(--ign-2));
+    box-shadow:0 14px 40px -12px rgba(255,106,44,.6);transition:transform .15s,box-shadow .2s,filter .2s;
+    display:inline-flex;align-items:center;gap:10px;
+  }
+  .ignite:hover{transform:translateY(-2px);box-shadow:0 20px 48px -12px rgba(255,106,44,.75)}
+  .ignite:active{transform:translateY(0)}
+  .ignite:disabled{filter:grayscale(.5) opacity(.55);cursor:not-allowed;transform:none;box-shadow:none}
+  .ignite svg{width:18px;height:18px}
+  .hint{font-family:"Space Mono",monospace;font-size:12px;color:var(--faint)}
+
+  /* ---------- output ---------- */
+  .stages{margin-top:14px;display:flex;flex-direction:column;gap:18px}
+  .stage{
+    background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;
+    opacity:0;transform:translateY(14px);transition:opacity .5s,transform .5s;
+  }
+  .stage.show{opacity:1;transform:none}
+  .stage-head{display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid var(--line)}
+  .stage-num{font-family:"Space Mono",monospace;font-size:13px;color:var(--ign-2);font-weight:700}
+  .stage-title{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:19px}
+  .stage-status{margin-left:auto;font-family:"Space Mono",monospace;font-size:11px;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:7px}
+  .stage-status .led{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+  .stage-status.run .led{background:var(--ign-1);box-shadow:0 0 9px var(--ign-1);animation:pulse 1s infinite}
+  .stage-status.done .led{background:var(--ok);box-shadow:0 0 9px var(--ok)}
+  .stage-body{padding:20px 22px}
+
+  .item{background:var(--base);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;margin-bottom:10px;position:relative}
+  .item:last-child{margin-bottom:0}
+  .hook-txt{font-size:16px;font-weight:500;padding-right:78px}
+  .copy{position:absolute;top:11px;right:11px;font-family:"Space Mono",monospace;font-size:11px;
+    letter-spacing:.1em;text-transform:uppercase;background:var(--surface2);border:1px solid var(--line-strong);
+    color:var(--muted);border-radius:8px;padding:6px 10px;cursor:pointer;transition:.15s}
+  .copy:hover{color:var(--text);border-color:var(--ign-2)}
+  .copy.copied{color:var(--ok);border-color:var(--ok)}
+
+  .script .s-title{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:16px;margin-bottom:10px;padding-right:78px}
+  .tag{display:inline-block;font-family:"Space Mono",monospace;font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--ign-2);background:rgba(255,178,62,.1);
+    border:1px solid rgba(255,178,62,.25);border-radius:6px;padding:3px 8px;margin-bottom:8px}
+  .beat{font-size:14px;color:var(--text);margin:6px 0;padding-left:16px;position:relative}
+  .beat::before{content:"▸";position:absolute;left:0;color:var(--ign-1)}
+  .cta-line{margin-top:10px;font-size:14px;color:var(--muted)}
+  .cta-line b{color:var(--ign-2);font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.1em}
+
+  .cap-plat{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--ign-2);margin-bottom:8px}
+  .cap-text{font-size:14px;white-space:pre-wrap;padding-right:78px}
+  .cap-tags{margin-top:8px;font-size:12px;color:var(--faint)}
+
+  .sched{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .day{background:var(--base);border:1px solid var(--line);border-radius:12px;padding:13px}
+  .day-num{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase}
+  .day-plat{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:15px;margin:5px 0 4px;color:var(--ign-2)}
+  .day-type{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .day-idea{font-size:13px;margin-top:7px;color:var(--text)}
+
+  .err{background:rgba(255,77,109,.08);border:1px solid rgba(255,77,109,.35);color:#ffb3c1;
+    border-radius:12px;padding:14px 16px;font-size:14px;margin-top:14px;font-family:"Space Mono",monospace}
+
+  .foot{text-align:center;margin-top:40px;font-family:"Space Mono",monospace;font-size:11px;
+    letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+
+  .btn-test{appearance:none;cursor:pointer;font-family:"Bricolage Grotesque",sans-serif;font-weight:700;
+    font-size:15px;color:var(--text);padding:13px 22px;border-radius:12px;
+    background:var(--surface2);border:1px solid var(--line-strong);transition:.18s}
+  .btn-test:hover{border-color:var(--ign-2);transform:translateY(-1px)}
+  .btn-test:disabled{opacity:.5;cursor:not-allowed}
+
+  @media(max-width:640px){
+    .grid{grid-template-columns:1fr}
+    .wrap{padding:30px 16px 70px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+    .stage{opacity:1;transform:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow"><span class="dot"></span> Dash // Content Engine</div>
+  <h1>Feed it once.<br>Get a <span class="glow">week of content.</span></h1>
+  <p class="lede">Drop in your niche and what you sell. Dash cycles through hooks, scripts, captions, and a posting schedule — ready to publish.</p>
+
+  <!-- CONNECTION -->
+  <section class="console">
+    <div class="console-head">
+      <span class="label">Engine Connection</span>
+      <span class="readout" id="connReadout"><span class="led"></span><span id="connText">Not connected</span></span>
+    </div>
+    <div class="grid">
+      <div class="field">
+        <label for="endpoint">Your AI endpoint (ngrok URL)</label>
+        <input id="endpoint" value="http://localhost:11434" placeholder="http://localhost:11434" />
+      </div>
+      <div class="field">
+        <label for="model">Model</label>
+        <input id="model" value="llama3" />
+      </div>
+    </div>
+    <div class="run-row">
+      <button class="btn-test" id="testBtn">Test connection</button>
+      <span class="hint" id="connHint">For your own Mac, leave it as localhost and test. Use an ngrok URL only for members.</span>
+    </div>
+  </section>
+
+  <!-- CONSOLE -->
+  <section class="console">
+    <div class="console-head">
+      <span class="label">Input Console</span>
+      <span class="readout" id="readout"><span class="led"></span><span id="readoutText">Idle — awaiting input</span></span>
+    </div>
+
+    <div class="grid">
+      <div class="field">
+        <label for="niche">Your niche</label>
+        <input id="niche" placeholder="e.g. solo founders scaling with AI" />
+      </div>
+      <div class="field">
+        <label for="audience">Who it's for</label>
+        <input id="audience" placeholder="e.g. beginner entrepreneurs, 20–35" />
+      </div>
+      <div class="field full">
+        <label for="product">Product or offer</label>
+        <textarea id="product" placeholder="e.g. a $47 course teaching faceless content + automation"></textarea>
+      </div>
+      <div class="field">
+        <label for="voice">Brand voice</label>
+        <select id="voice">
+          <option>Bold &amp; energetic</option>
+          <option>Direct &amp; no-fluff</option>
+          <option>Educational &amp; clear</option>
+          <option>Story-driven</option>
+          <option>Calm &amp; premium</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Platforms</label>
+        <div class="chips" id="platforms">
+          <span class="chip on" data-p="TikTok">TikTok</span>
+          <span class="chip on" data-p="Instagram Reels">Reels</span>
+          <span class="chip on" data-p="YouTube Shorts">Shorts</span>
+          <span class="chip" data-p="Pinterest">Pinterest</span>
+          <span class="chip" data-p="X / Twitter">X</span>
+          <span class="chip" data-p="LinkedIn">LinkedIn</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="run-row">
+      <button class="ignite" id="runBtn">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l0-8z" fill="currentColor"/></svg>
+        Generate content plan
+      </button>
+      <span class="hint" id="hint">Fill it in, then fire the engine</span>
+    </div>
+    <div id="errBox"></div>
+  </section>
+
+  <!-- OUTPUT STAGES -->
+  <div class="stages" id="stages"></div>
+
+  <div class="foot">Dash · digitaldashers2.com</div>
+</div>
+
+<script>
+const STAGES = [
+  {key:"hooks",   num:"01", title:"Scroll-stopping hooks"},
+  {key:"scripts", num:"02", title:"Video scripts"},
+  {key:"captions",num:"03", title:"Platform captions"},
+  {key:"schedule",num:"04", title:"7-day posting schedule"},
+];
+
+// platform chips
+document.getElementById('platforms').addEventListener('click', e=>{
+  if(e.target.classList.contains('chip')) e.target.classList.toggle('on');
+});
+function selectedPlatforms(){
+  return [...document.querySelectorAll('#platforms .chip.on')].map(c=>c.dataset.p);
+}
+
+const runBtn = document.getElementById('runBtn');
+const readout = document.getElementById('readout');
+const readoutText = document.getElementById('readoutText');
+const errBox = document.getElementById('errBox');
+
+function setReadout(state, text){
+  readout.className = 'readout ' + state;
+  readoutText.textContent = text;
+}
+
+// ---- connection ----
+const endpointEl=document.getElementById('endpoint');
+const modelEl=document.getElementById('model');
+const connReadout=document.getElementById('connReadout');
+const connText=document.getElementById('connText');
+const testBtn=document.getElementById('testBtn');
+
+function baseUrl(){ return endpointEl.value.trim().replace(/\/+$/,''); }
+function setConn(state,text){ connReadout.className='readout '+state; connText.textContent=text; }
+function buildHeaders(extra){
+  const h=Object.assign({},extra||{});
+  if(baseUrl().includes('ngrok')) h['ngrok-skip-browser-warning']='true';
+  return h;
+}
+
+async function testConnection(){
+  const base=baseUrl();
+  if(!base){ setConn('','Paste your ngrok URL first'); return; }
+  setConn('run','Pinging engine…'); testBtn.disabled=true;
+  try{
+    const res=await fetch(base+'/api/tags',{headers:buildHeaders()});
+    if(!res.ok) throw new Error('status '+res.status);
+    const data=await res.json();
+    const names=(data.models||[]).map(m=>m.name).join(', ')||'no models installed';
+    setConn('live','Connected · '+names);
+  }catch(err){
+    setConn('','Can\'t reach it — is Ollama + ngrok running? ('+err.message+')');
+  }finally{ testBtn.disabled=false; }
+}
+testBtn.addEventListener('click',testConnection);
+
+// ---- model call (Ollama) ----
+async function callModel(prompt){
+  const base=baseUrl();
+  if(!base) throw new Error('No endpoint set');
+  const res=await fetch(base+'/api/chat',{
+    method:'POST',
+    headers:buildHeaders({'Content-Type':'application/json'}),
+    body:JSON.stringify({
+      model:modelEl.value.trim()||'llama3',
+      messages:[{role:'user',content:prompt}],
+      stream:false,
+      format:'json'
+    })
+  });
+  if(!res.ok) throw new Error('Engine fault — status '+res.status);
+  const data=await res.json();
+  return (data.message && data.message.content) ? data.message.content : '';
+}
+function parseJSON(text){
+  let t = text.replace(/```json/gi,"").replace(/```/g,"").trim();
+  const s=t.indexOf("{"), e=t.lastIndexOf("}");
+  if(s!==-1&&e!==-1) t=t.slice(s,e+1);
+  return JSON.parse(t);
+}
+
+function ctx(){
+  const niche=document.getElementById('niche').value.trim();
+  const audience=document.getElementById('audience').value.trim();
+  const product=document.getElementById('product').value.trim();
+  const voice=document.getElementById('voice').value;
+  const plats=selectedPlatforms();
+  return {niche,audience,product,voice,plats};
+}
+
+const PROMPTS = {
+  hooks:(c)=>`You are a viral short-form content strategist. Voice: ${c.voice}.
+Niche: ${c.niche}. Audience: ${c.audience}. Product/offer: ${c.product}.
+Write 8 scroll-stopping opening hooks for short-form video (first 3 seconds). Punchy, specific, varied (curiosity, bold claim, problem, contrarian, story, list, question, callout).
+Return ONLY JSON, no markdown: {"hooks":["...","..."]}`,
+
+  scripts:(c)=>`You are a short-form video scriptwriter. Voice: ${c.voice}.
+Niche: ${c.niche}. Audience: ${c.audience}. Product/offer: ${c.product}.
+Write 2 complete 30–45 second video scripts. Each: a hook line, 3-4 punchy body beats, and a CTA that points toward the offer.
+Return ONLY JSON, no markdown: {"scripts":[{"title":"short label","hook":"...","beats":["...","..."],"cta":"..."}]}`,
+
+  captions:(c)=>`You are a social copywriter. Voice: ${c.voice}.
+Niche: ${c.niche}. Audience: ${c.audience}. Product/offer: ${c.product}.
+Write one ready-to-post caption for EACH of these platforms: ${c.plats.join(", ")}. Match each platform's style and length. Include 3-6 relevant hashtags per caption.
+Return ONLY JSON, no markdown: {"captions":[{"platform":"...","text":"...","hashtags":["#..."]}]}`,
+
+  schedule:(c)=>`You are a content planner. Voice: ${c.voice}.
+Niche: ${c.niche}. Audience: ${c.audience}. Product/offer: ${c.product}. Platforms: ${c.plats.join(", ")}.
+Build a 7-day posting schedule. For each day give: the platform to post on, the content type, and a one-line content idea. Spread platforms sensibly.
+Return ONLY JSON, no markdown: {"schedule":[{"day":"Day 1","platform":"...","type":"...","idea":"..."}]}`
+};
+
+// ---- rendering ----
+function stageShell(){
+  const stages=document.getElementById('stages');
+  stages.innerHTML='';
+  STAGES.forEach(s=>{
+    const el=document.createElement('section');
+    el.className='stage'; el.id='stage-'+s.key;
+    el.innerHTML=`<div class="stage-head">
+        <span class="stage-num">${s.num}</span>
+        <span class="stage-title">${s.title}</span>
+        <span class="stage-status" id="status-${s.key}"><span class="led"></span><span>queued</span></span>
+      </div>
+      <div class="stage-body" id="body-${s.key}"></div>`;
+    stages.appendChild(el);
+  });
+}
+function showStage(key){ document.getElementById('stage-'+key).classList.add('show'); }
+function stageStatus(key,state,text){
+  const el=document.getElementById('status-'+key);
+  el.className='stage-status '+state;
+  el.querySelector('span:last-child').textContent=text;
+}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function copyBtn(text){
+  return `<button class="copy" onclick="copyText(this,'${esc(text).replace(/'/g,"\\'")}')">Copy</button>`;
+}
+window.copyText=function(btn,text){
+  const tmp=document.createElement('textarea');
+  tmp.innerHTML=text; const clean=tmp.value;
+  navigator.clipboard.writeText(clean).then(()=>{
+    btn.textContent='Copied'; btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='Copy';btn.classList.remove('copied');},1400);
+  });
+};
+
+function renderHooks(d){
+  return d.hooks.map(h=>`<div class="item"><div class="hook-txt">${esc(h)}</div>${copyBtn(h)}</div>`).join('');
+}
+function renderScripts(d){
+  return d.scripts.map(s=>{
+    const full=`${s.hook}\n\n${(s.beats||[]).join('\n')}\n\nCTA: ${s.cta}`;
+    return `<div class="item script">
+      <div class="s-title">${esc(s.title)}</div>${copyBtn(full)}
+      <span class="tag">Hook</span><div class="beat" style="font-weight:600">${esc(s.hook)}</div>
+      ${(s.beats||[]).map(b=>`<div class="beat">${esc(b)}</div>`).join('')}
+      <div class="cta-line"><b>CTA</b> &nbsp;${esc(s.cta)}</div>
+    </div>`;
+  }).join('');
+}
+function renderCaptions(d){
+  return d.captions.map(c=>{
+    const full=`${c.text}\n\n${(c.hashtags||[]).join(' ')}`;
+    return `<div class="item">
+      <div class="cap-plat">${esc(c.platform)}</div>${copyBtn(full)}
+      <div class="cap-text">${esc(c.text)}</div>
+      <div class="cap-tags">${esc((c.hashtags||[]).join('  '))}</div>
+    </div>`;
+  }).join('');
+}
+function renderSchedule(d){
+  return `<div class="sched">${d.schedule.map(x=>`
+    <div class="day">
+      <div class="day-num">${esc(x.day)}</div>
+      <div class="day-plat">${esc(x.platform)}</div>
+      <div class="day-type">${esc(x.type)}</div>
+      <div class="day-idea">${esc(x.idea)}</div>
+    </div>`).join('')}</div>`;
+}
+const RENDER={hooks:renderHooks,scripts:renderScripts,captions:renderCaptions,schedule:renderSchedule};
+
+// ---- run ----
+async function run(){
+  errBox.innerHTML='';
+  const c=ctx();
+  if(!c.niche || !c.product){
+    errBox.innerHTML='<div class="err">Need a niche and a product/offer before the engine can run.</div>';
+    return;
+  }
+  if(c.plats.length===0){
+    errBox.innerHTML='<div class="err">Pick at least one platform.</div>';
+    return;
+  }
+  if(!baseUrl()){
+    errBox.innerHTML='<div class="err">Connect your engine first — paste your ngrok URL up top and hit Test connection.</div>';
+    return;
+  }
+  runBtn.disabled=true;
+  setReadout('run','Engine running…');
+  stageShell();
+
+  for(const s of STAGES){
+    showStage(s.key);
+    stageStatus(s.key,'run','generating');
+    try{
+      const raw=await callModel(PROMPTS[s.key](c));
+      const data=parseJSON(raw);
+      document.getElementById('body-'+s.key).innerHTML=RENDER[s.key](data);
+      stageStatus(s.key,'done','ready');
+    }catch(err){
+      stageStatus(s.key,'','failed');
+      document.getElementById('body-'+s.key).innerHTML=
+        `<div class="err">${esc(s.title)} failed: ${esc(err.message)}. Hit generate again.</div>`;
+    }
+  }
+  setReadout('live','Plan ready');
+  runBtn.disabled=false;
+}
+runBtn.addEventListener('click',run);
+</script>
+</body>
+</html>
